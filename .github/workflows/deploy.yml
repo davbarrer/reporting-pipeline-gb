@@ -3,14 +3,14 @@ name: Deploy FastAPI to EC2
 on:
   push:
     branches:
-      - main
+      - main  # Trigger deployment when changes are pushed to main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
       - name: Setup SSH Connection
@@ -24,13 +24,12 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
+      - name: Upload Deploy Script to EC2
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
-          cd ~/reporting-pipeline-gb/fastapi-app
-          git pull origin main
-          docker build -t fastapi-app .
-          docker stop fastapi-container || true
-          docker rm fastapi-container || true
-          docker run -d --name fastapi-container -p 8000:8000 fastapi-app
-          EOF
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no deploy.sh $EC2_USER@$EC2_HOST:/home/ubuntu/deploy.sh
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "chmod +x /home/ubuntu/deploy.sh"
+
+      - name: Run Deploy Script on EC2
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "/home/ubuntu/deploy.sh"
+
