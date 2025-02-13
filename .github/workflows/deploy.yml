@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3  # ✅ Ensures `deploy.sh` is available
 
       - name: Setup SSH Connection
         env:
@@ -26,10 +26,10 @@ jobs:
 
       - name: Upload Deploy Script to EC2
         run: |
-          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no deploy.sh $EC2_USER@$EC2_HOST:/home/ubuntu/deploy.sh
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "chmod +x /home/ubuntu/deploy.sh"
+          echo "EC2 Host: $EC2_HOST"  # Debugging step to verify EC2_HOST
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no deploy.sh $EC2_USER@${EC2_HOST}:/home/ubuntu/deploy.sh
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $EC2_USER@${EC2_HOST} "chmod +x /home/ubuntu/deploy.sh"
 
       - name: Run Deploy Script on EC2
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "/home/ubuntu/deploy.sh"
-
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no $EC2_USER@${EC2_HOST} "/home/ubuntu/deploy.sh"
