@@ -6,5 +6,5 @@ echo "Rebuilding Docker container..."
 docker build -t fastapi-app .
 docker stop fastapi-container || true
 docker rm fastapi-container || true
-docker run -d --name fastapi-container -p 8000:8000 fastapi-app
+docker run --env-file .env -d --name fastapi-container -p 8000:8000 fastapi-app
 echo "Deployment complete!"
