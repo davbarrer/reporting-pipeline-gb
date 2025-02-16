@@ -52,6 +52,8 @@ async def home():
             "/insert",
             "/metrics/hired-employees-by-quarter",
             "/metrics/departments-above-average-hiring",
+            "/visuals/departments-above-average-hiring",
+            "/visuals/hired-employees-by-quarter"
             "/docs",
         ]
     }
