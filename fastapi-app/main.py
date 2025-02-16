@@ -63,7 +63,7 @@ async def insert_data(request: InsertRequest, db=Depends(get_db)):
         valid_records = []
         failed_records = []
 
-        async with db.transaction():  # SOne transaction for all inserts
+        async with db.transaction():  # One transaction for all inserts
             for record in request.data:
                 if not all(field in record for field in required_fields):
                     failed_records.append(record)
@@ -111,7 +111,8 @@ async def insert_data(request: InsertRequest, db=Depends(get_db)):
 
 @app.get("/metrics/hired-employees-by-quarter")
 async def get_hired_employees_by_quarter(db: asyncpg.Connection = Depends(get_db)):
-    """Returns the number of employees hired per job and department in 2021, grouped by quarter."""
+    """Returns the number of employees hired per job and department in 2021,
+      grouped by quarter."""
 
     query = """
     SELECT 
