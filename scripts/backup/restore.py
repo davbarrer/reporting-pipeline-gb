@@ -8,15 +8,12 @@ from datetime import datetime
 from utils import get_db_connection, download_from_s3
 from dotenv import load_dotenv
 
-# Load environment variables
 env_path = os.path.abspath(os.path.join(
     os.path.dirname(__file__), "..", "..", ".env"))
 load_dotenv(env_path)
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
-# Allowed table names
 VALID_TABLES = {"departments", "jobs", "hired_employees"}
 
 
@@ -24,13 +21,12 @@ async def restore_table(table_name):
     """Restores a specific table from its AVRO backup in S3."""
     logger.info(f"Starting restore for table: {table_name}")
 
-    # Validate table name
     if table_name not in VALID_TABLES:
         logger.error(
             f"Invalid table name: {table_name}. Allowed: {VALID_TABLES}")
         return
 
-    # Step 1: Download the AVRO file from S3
+    # Download the AVRO file from S3
     local_file = f"{table_name}_backup.avro"
     download_success = download_from_s3(table_name, local_file)
 
@@ -65,7 +61,6 @@ async def restore_table(table_name):
             df["hire_datetime"], format="%Y-%m-%dT%H:%M:%S%z", utc=True)
         logger.info(f"Converted hire_datetime to datetime object")
 
-    # Insert data into PostgreSQL using Upsert
     conn = await get_db_connection()
     try:
         # Generate SQL query dynamically
