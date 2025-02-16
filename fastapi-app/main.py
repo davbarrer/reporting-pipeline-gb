@@ -229,3 +229,53 @@ async def visualize_hired_employees(db: asyncpg.Connection = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error generating visualization: {e}")
         return {"error": "Internal Server Error"}
+
+
+@app.get("/visuals/departments-above-average-hiring")
+async def visualize_departments_above_average(db: asyncpg.Connection = Depends(get_db)):
+    """Returns a horizontal bar chart image of departments that hired above the 2021 average."""
+
+    try:
+        data = await get_departments_above_average(db)
+
+        if isinstance(data, dict) and "error" in data:
+            return data
+
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            return {"error": "No data available"}
+
+        # Fetch the correct average directly from the database
+        avg_query = "SELECT AVG(hired) FROM (SELECT COUNT(he.id) AS hired FROM hired_employees he WHERE EXTRACT(YEAR FROM he.hire_datetime) = 2021 GROUP BY he.department_id) AS department_hiring"
+        avg_hires = await db.fetchval(avg_query)
+
+        # Extract department names and hire counts
+        departments = df["department"]
+        hires = df["hired"]
+
+        # Create the figure
+        plt.figure(figsize=(10, 6))
+        ax = sns.barplot(y=departments, x=hires, palette="Blues_r")
+
+        # display average query
+        plt.axvline(avg_hires, color="red", linestyle="dashed",
+                    label=f"Avg Hires: {avg_hires:.2f}")
+
+        plt.xlabel("Number of Hires")
+        plt.ylabel("Department")
+        plt.title("Departments That Hired More Than the 2021 Average")
+        plt.legend()
+
+        # Save figure to buffer
+        img_bytes = BytesIO()
+        plt.tight_layout()
+        plt.savefig(img_bytes, format="png", bbox_inches="tight")
+        plt.close()
+        img_bytes.seek(0)
+
+        return Response(content=img_bytes.getvalue(), media_type="image/png")
+
+    except Exception as e:
+        logger.error(f"Error generating visualization: {e}")
+        return {"error": "Internal Server Error"}
