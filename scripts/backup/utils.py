@@ -102,7 +102,7 @@ def save_as_avro(df, table_name):
             f"No data found in table {table_name}, skipping backup.")
         return None
 
-    avro_filename = f"{table_name}_backup_{datetime.today().strftime('%Y-%m-%d')}.avro"
+    avro_filename = f"{table_name}_backup.avro"
 
     dtype_mapping = {
         "int64": "int",
@@ -149,7 +149,7 @@ def upload_to_s3(file_path, table_name):
     try:
         s3_client = boto3.client(
             "s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
-        s3_filename = f"{table_name}_backup_{datetime.today().strftime('%Y-%m-%d')}.avro"
+        s3_filename = f"{table_name}_backup.avro"
 
         s3_client.upload_file(file_path, S3_BUCKET, s3_filename)
         logger.info(
@@ -166,7 +166,7 @@ def download_from_s3(table_name, local_path):
     try:
         s3_client = boto3.client(
             "s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
-        s3_filename = f"{table_name}_backup_{datetime.today().strftime('%Y-%m-%d')}.avro"
+        s3_filename = f"{table_name}_backup.avro"
 
         s3_client.download_file(S3_BUCKET, s3_filename, local_path)
         logger.info(f"Downloaded {s3_filename} from S3 to {local_path}")
