@@ -39,6 +39,20 @@ TABLE_SCHEMAS = {
 }
 
 
+@app.get("/")
+async def home():
+    return {
+        "message": "Welcome to the Reporting API! refer to the /docs endpoint for more info",
+        "status": "running",
+        "endpoints": [
+            "/insert",
+            "/metrics/hired-employees-by-quarter",
+            "/metrics/departments-above-average-hiring",
+            "/docs",
+        ]
+    }
+
+
 @app.post("/insert", response_model=InsertResponse)
 async def insert_data(request: InsertRequest, db=Depends(get_db)):
     try:
