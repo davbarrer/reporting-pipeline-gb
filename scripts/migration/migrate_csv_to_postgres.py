@@ -12,23 +12,19 @@ env_path = os.path.abspath(os.path.join(
     os.path.dirname(__file__), "..", "..", ".env"))
 load_dotenv(env_path)
 
-# AWS Configuration
 S3_BUCKET = "data-pipeline-migration-gb"
 CLOUDWATCH_LOG_GROUP = "data-migration-logs"
 
-# PostgreSQL Configuration
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_PORT = os.getenv("DB_PORT")
 
-# AWS Clients
 s3_client = boto3.client("s3")
 cloudwatch_handler = watchtower.CloudWatchLogHandler(
     log_group=CLOUDWATCH_LOG_GROUP)
 
-# Configure Logging (No Local Log File)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -143,7 +139,6 @@ def migrate():
             conn.close()
             logging.info("Connection closed.")
 
-        # Upload failed records log to S3 and delete it
         upload_log_to_s3("failed_records.log", "logs/failed_records.log")
 
 
