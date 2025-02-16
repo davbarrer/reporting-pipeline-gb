@@ -5,6 +5,7 @@ import asyncpg
 import traceback
 from datetime import datetime
 from dotenv import load_dotenv
+import logging
 import os
 
 env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
@@ -12,13 +13,14 @@ load_dotenv(env_path)
 
 app = FastAPI()
 
-# Database Connection Settings
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-# Dependency: Get Database Connection (Auto-Close After Request)
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 async def get_db():
@@ -35,6 +37,20 @@ TABLE_SCHEMAS = {
     "jobs": ["job"],
     "hired_employees": ["name", "hire_datetime", "department_id", "job_id"],
 }
+
+
+@app.get("/")
+async def home():
+    return {
+        "message": "Welcome to the Reporting API! refer to the /docs endpoint for more info",
+        "status": "running",
+        "endpoints": [
+            "/insert",
+            "/metrics/hired-employees-by-quarter",
+            "/metrics/departments-above-average-hiring",
+            "/docs",
+        ]
+    }
 
 
 @app.post("/insert", response_model=InsertResponse)
@@ -79,7 +95,7 @@ async def insert_data(request: InsertRequest, db=Depends(get_db)):
                     sql_query = f"INSERT INTO {request.table} ({columns}) VALUES ({values_placeholders}) RETURNING id"
                     inserted_id = await db.fetchval(sql_query, *tuple(record[field] for field in required_fields))
 
-                    print(f"Inserted record with ID: {inserted_id}")
+                    logger.info(f"Inserted record with ID: {inserted_id}")
 
         return {
             "success": True if valid_records else False,
@@ -89,10 +105,75 @@ async def insert_data(request: InsertRequest, db=Depends(get_db)):
 
     except Exception as e:
         error_message = f"Internal Server Error: {str(e)}\n{traceback.format_exc()}"
-        print(error_message)
+        logger.error(error_message)
         raise HTTPException(status_code=500, detail=error_message)
 
 
-@app.get("/")
-def home():
-    return {"message": "FastAPI on EC2 is working yes sir!"}
+@app.get("/metrics/hired-employees-by-quarter")
+async def get_hired_employees_by_quarter(db: asyncpg.Connection = Depends(get_db)):
+    """Returns the number of employees hired per job and department in 2021, grouped by quarter."""
+
+    query = """
+    SELECT 
+        d.department AS department, 
+        j.job AS job, 
+        COUNT(CASE WHEN EXTRACT(QUARTER FROM he.hire_datetime) = 1 THEN 1 END) AS Q1,
+        COUNT(CASE WHEN EXTRACT(QUARTER FROM he.hire_datetime) = 2 THEN 1 END) AS Q2,
+        COUNT(CASE WHEN EXTRACT(QUARTER FROM he.hire_datetime) = 3 THEN 1 END) AS Q3,
+        COUNT(CASE WHEN EXTRACT(QUARTER FROM he.hire_datetime) = 4 THEN 1 END) AS Q4
+    FROM hired_employees he
+    JOIN departments d ON he.department_id = d.id
+    JOIN jobs j ON he.job_id = j.id
+    WHERE EXTRACT(YEAR FROM he.hire_datetime) = 2021
+    GROUP BY d.department, j.job
+    ORDER BY d.department ASC, j.job ASC;
+    """
+
+    try:
+        logger.info("Executing query to fetch hired employees by quarter")
+        results = await db.fetch(query)
+        logger.info(
+            f"Query executed successfully, retrieved {len(results)} records")
+        return [dict(row) for row in results]
+    except Exception as e:
+        logger.error(f"Error executing query: {e}")
+        return {"error": "Internal Server Error"}
+
+
+@app.get("/metrics/departments-above-average-hiring")
+async def get_departments_above_average(db: asyncpg.Connection = Depends(get_db)):
+    """Returns departments that hired more employees than the 2021 average."""
+
+    query = """
+    WITH department_hiring AS (
+        SELECT 
+            he.department_id AS id, 
+            d.department, 
+            COUNT(he.id) AS hired
+        FROM hired_employees he
+        JOIN departments d ON he.department_id = d.id
+        WHERE EXTRACT(YEAR FROM he.hire_datetime) = 2021
+        GROUP BY he.department_id, d.department
+    ),
+    average_hiring AS (
+        SELECT AVG(hired) AS avg_hires FROM department_hiring
+    )
+    SELECT 
+        dh.id, 
+        dh.department, 
+        dh.hired
+    FROM department_hiring dh
+    JOIN average_hiring ah ON dh.hired > ah.avg_hires
+    ORDER BY dh.hired DESC;
+    """
+
+    try:
+        logger.info(
+            "Executing query to fetch departments with above-average hiring")
+        results = await db.fetch(query)
+        logger.info(
+            f"Query executed successfully, retrieved {len(results)} records")
+        return [dict(row) for row in results]
+    except Exception as e:
+        logger.error(f"Error executing query: {e}")
+        return {"error": "Internal Server Error"}
