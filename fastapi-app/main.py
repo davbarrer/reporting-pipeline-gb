@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Response
 from models.request import InsertRequest
 from models.response import InsertResponse
 import asyncpg
@@ -7,6 +7,10 @@ from datetime import datetime
 from dotenv import load_dotenv
 import logging
 import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from io import BytesIO
 
 env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(env_path)
@@ -115,9 +119,9 @@ async def get_hired_employees_by_quarter(db: asyncpg.Connection = Depends(get_db
       grouped by quarter."""
 
     query = """
-    SELECT 
-        d.department AS department, 
-        j.job AS job, 
+    SELECT
+        d.department AS department,
+        j.job AS job,
         COUNT(CASE WHEN EXTRACT(QUARTER FROM he.hire_datetime) = 1 THEN 1 END) AS Q1,
         COUNT(CASE WHEN EXTRACT(QUARTER FROM he.hire_datetime) = 2 THEN 1 END) AS Q2,
         COUNT(CASE WHEN EXTRACT(QUARTER FROM he.hire_datetime) = 3 THEN 1 END) AS Q3,
@@ -147,9 +151,9 @@ async def get_departments_above_average(db: asyncpg.Connection = Depends(get_db)
 
     query = """
     WITH department_hiring AS (
-        SELECT 
-            he.department_id AS id, 
-            d.department, 
+        SELECT
+            he.department_id AS id,
+            d.department,
             COUNT(he.id) AS hired
         FROM hired_employees he
         JOIN departments d ON he.department_id = d.id
@@ -159,9 +163,9 @@ async def get_departments_above_average(db: asyncpg.Connection = Depends(get_db)
     average_hiring AS (
         SELECT AVG(hired) AS avg_hires FROM department_hiring
     )
-    SELECT 
-        dh.id, 
-        dh.department, 
+    SELECT
+        dh.id,
+        dh.department,
         dh.hired
     FROM department_hiring dh
     JOIN average_hiring ah ON dh.hired > ah.avg_hires
@@ -177,4 +181,51 @@ async def get_departments_above_average(db: asyncpg.Connection = Depends(get_db)
         return [dict(row) for row in results]
     except Exception as e:
         logger.error(f"Error executing query: {e}")
+        return {"error": "Internal Server Error"}
+
+
+@app.get("/visuals/hired-employees-by-quarter")
+async def visualize_hired_employees(db: asyncpg.Connection = Depends(get_db)):
+    """Returns a bar chart image of employees hired per department and quarter."""
+
+    try:
+        data = await get_hired_employees_by_quarter(db)
+
+        # Check if the function returned an error
+        if isinstance(data, dict) and "error" in data:
+            return data
+
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            return {"error": "No data available"}
+
+        # Transform Data for Plotting
+        df_melted = df.melt(
+            id_vars=["department", "job"], var_name="Quarter", value_name="Hires")
+
+        # Create the Plot
+        plt.figure(figsize=(12, 6))
+        ax = sns.barplot(data=df_melted, x="Quarter",
+                         y="Hires", hue="department", estimator=sum)
+        ax.yaxis.get_major_locator().set_params(integer=True)
+
+        plt.title("Employees Hired Per Quarter (2021)")
+        plt.xlabel("Quarter")
+        plt.ylabel("Number of Hires")
+        plt.xticks(rotation=0)
+        plt.legend(title="Department", bbox_to_anchor=(
+            1.05, 1), loc='upper left')
+
+        # Save Plot to Memory
+        img_bytes = BytesIO()
+        plt.tight_layout()
+        plt.savefig(img_bytes, format="png")
+        plt.close()
+        img_bytes.seek(0)
+
+        return Response(content=img_bytes.getvalue(), media_type="image/png")
+
+    except Exception as e:
+        logger.error(f"Error generating visualization: {e}")
         return {"error": "Internal Server Error"}
