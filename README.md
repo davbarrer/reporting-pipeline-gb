@@ -5,6 +5,8 @@ This project is a **data pipeline and reporting system** designed to process, st
 
 The system is built with **FastAPI**, **PostgreSQL (Amazon RDS)**, and **AWS S3**, ensuring scalability and efficiency for handling large datasets.  
 
+Spec:
+https://reporting-db-gb-davbarrer.atlassian.net/wiki/spaces/~712020ac60413090124018883bc423d9735910/pages/131240/Migration+and+reporting+pipeline
 ---
 
 ## **📌 Key Features**  
